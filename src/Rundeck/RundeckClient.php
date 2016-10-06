@@ -71,9 +71,14 @@ class RundeckClient
 
 		$data = $this->decodeResponse($resp);
 
-		if(!isset($data['jobs']['job'])) return false;
+		if(!isset($data['jobs']['job'])) {
+			return false;
+		}
+		if(isset($data['jobs']['job']['@attributes'])){
+			$data['jobs']['job'] = array($data['jobs']['job']);
+		}
 
-		return (new api\JobApiMapper)->getAllFromEncoded(array($data['jobs']['job']));
+		return (new api\JobApiMapper)->getAllFromEncoded($data['jobs']['job']);
 	}
 
 	public function runJob($id)
@@ -84,7 +89,40 @@ class RundeckClient
 
 		$data = $this->decodeResponse($resp);
 
-		return (new api\JobApiMapper)->getAllFromEncoded(array($data['executions']['execution']['job']));
+		if(!isset($data['executions']['execution'])) {
+			return false;
+		}
+		if(isset($data['executions']['execution']['@attributes'])){
+			$data['executions']['execution'] = array($data['executions']['execution']);
+		}
+
+		return (new api\JobApiMapper)->getAllFromEncoded($data['executions']['execution']['job']);
+	}
+
+	public function getJobsExecutions($jobId, $offset = 0, $max = null)
+	{
+		$offsetPath = $maxPath = '';
+		if ($offset) {
+			$offsetPath .= '&offset=' . $offset;
+		}
+		if ($max) {
+			$maxPath .= '&max=' . $max;
+		}
+
+		$resp = $this->client->get("/api/1/job/$jobId/executions?a$offsetPath$maxPath", [
+			'cookies' => ['JSESSIONID' => $this->jsession]
+		]);
+
+		$data = $this->decodeResponse($resp);
+
+		if(!isset($data['executions']['execution'])) {
+			return false;
+		}
+		if(isset($data['executions']['execution']['@attributes'])){
+			$data['executions']['execution'] = array($data['executions']['execution']);
+		}
+
+		return (new api\ExecutionApiMapper)->getAllFromEncoded($data['executions']['execution']);
 	}
 
 	public function createProject($name)
