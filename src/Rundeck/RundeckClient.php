@@ -89,11 +89,11 @@ class RundeckClient
 
 		$data = $this->decodeResponse($resp);
 
-		if(!isset($data['executions']['execution'])) {
+		if(!isset($data['executions']['execution']['job'])) {
 			return false;
 		}
-		if(isset($data['executions']['execution']['@attributes'])){
-			$data['executions']['execution'] = array($data['executions']['execution']);
+		if(isset($data['executions']['execution']['job']['@attributes'])){
+			$data['executions']['execution']['job'] = array($data['executions']['execution']['job']);
 		}
 
 		return (new api\JobApiMapper)->getAllFromEncoded($data['executions']['execution']['job']);
