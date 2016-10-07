@@ -99,17 +99,20 @@ class RundeckClient
 		return (new api\JobApiMapper)->getAllFromEncoded($data['executions']['execution']['job']);
 	}
 
-	public function getJobsExecutions($jobId, $offset = 0, $max = null)
+	public function getJobsExecutions($jobId, $status = null, $offset = 0, $max = null)
 	{
-		$offsetPath = $maxPath = '';
+		$offsetPath = $maxPath = $statusPath = '';
 		if ($offset) {
 			$offsetPath .= '&offset=' . $offset;
 		}
 		if ($max) {
 			$maxPath .= '&max=' . $max;
 		}
+		if ($status) {
+			$statusPath .= '&status=' . $status;
+		}
 
-		$resp = $this->client->get("/api/1/job/$jobId/executions?a$offsetPath$maxPath", [
+		$resp = $this->client->get("/api/1/job/$jobId/executions?a$offsetPath$maxPath$statusPath", [
 			'cookies' => ['JSESSIONID' => $this->jsession]
 		]);
 
