@@ -5,6 +5,7 @@ namespace Rundeck\Api;
 class ExecutionApiMapper {
 
 	public function getFromEncoded(array $params) {
+		if(!isset($params['date-ended']))$params['date-ended'] = null;
 		return (new Execution())
 			->setId((string)$params['@attributes']['id'])
 			->setStatus((string)$params['@attributes']['status'])
