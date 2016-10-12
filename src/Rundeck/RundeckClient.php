@@ -56,29 +56,58 @@ class RundeckClient
 		return (new api\ProjectApiMapper)->getAllFromEncoded($data['projects']['project']);
 	}
 
-	public function getJobs($projectName, $jobId = null, $groupName = null)
+	public function getJobs($projectName, $jobId = null, $groupName = null, $filterName = null)
 	{
-		$jobPath = $groupPath = '';
+		$jobPath = $groupPath = $filterPath = '';
 		if ($jobId) {
 			$jobPath .= '&idlist=' . $jobId;
 		}
 		if ($groupName) {
 			$groupPath .= '&groupPath=' . $groupName;
 		}
-		$resp = $this->client->get("/api/1/jobs?project=$projectName$jobPath$groupPath", [
+		if ($filterName) {
+			$filterPath .= '&jobExactFilter=' . $filterName;
+		}
+		$resp = $this->client->get("/api/14/project/$projectName/jobs?a$jobPath$groupPath$filterPath", [
 			'cookies' => ['JSESSIONID' => $this->jsession]
 		]);
 
 		$data = $this->decodeResponse($resp);
 
-		if(!isset($data['jobs']['job'])) {
+		if(!isset($data['job'])) {
 			return false;
 		}
-		if(isset($data['jobs']['job']['@attributes'])){
-			$data['jobs']['job'] = array($data['jobs']['job']);
+		if(isset($data['job']['@attributes'])){
+			$data['job'] = array($data['job']);
 		}
 
-		return (new api\JobApiMapper)->getAllFromEncoded($data['jobs']['job']);
+		return (new api\JobApiMapper)->getAllFromEncoded($data['job']);
+	}
+
+	public function disableScheduledJob($jobId)
+	{
+		try {
+			$response = $this->client->post("/api/14/job/$jobId/schedule/disable", [
+				'cookies' => ['JSESSIONID' => $this->jsession]
+			]);
+			$data = $this->decodeResponse($response);
+			return $data;
+		} catch (ClientException $e) {
+			// ignore, assume it's a 400 and the project already exists
+		}
+	}
+
+	public function enableScheduledJob($jobId)
+	{
+		try {
+			$response = $this->client->post("/api/14/job/$jobId/schedule/enable", [
+				'cookies' => ['JSESSIONID' => $this->jsession]
+			]);
+			$data = $this->decodeResponse($response);
+			return $data;
+		} catch (ClientException $e) {
+			// ignore, assume it's a 400 and the project already exists
+		}
 	}
 
 	public function runJob($id)
@@ -128,6 +157,15 @@ class RundeckClient
 		return (new api\ExecutionApiMapper)->getAllFromEncoded($data['executions']['execution']);
 	}
 
+	public function getJobsExecStatus($execId)
+	{
+		$resp = $this->client->get("/api/5/execution/$execId/output", [
+			'cookies' => ['JSESSIONID' => $this->jsession]
+		]);
+		$data = $this->decodeResponse($resp);
+		return $data;
+	}
+
 	public function createProject($name)
 	{
 		if ($this->majorMinorVersion < 21) {
@@ -170,7 +208,7 @@ class RundeckClient
 		])->xml()->asXML();
 	}
 
-	public function importJobs($projectName, $xml)
+	public function importJobs($projectName, $xml, $mode = 'create')
 	{
 		try {
 			$response = $this->client->post("/api/10/jobs/import", [
@@ -179,6 +217,7 @@ class RundeckClient
 				'body' => [
 					'project' => $projectName,
 					'uuidOption' => 'preserve',
+					'dupeOption' => $mode,
 					'xmlBatch' => $xml,
 				],
 			]);
