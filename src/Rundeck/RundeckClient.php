@@ -208,23 +208,20 @@ class RundeckClient
 		])->xml()->asXML();
 	}
 
-	public function importJobs($projectName, $xml, $mode = 'create')
+	public function importJobs($projectName, $xml,$mode = 'create')
 	{
 		try {
-			$response = $this->client->post("/api/10/jobs/import", [
-				'cookies' => ['JSESSIONID' => $this->jsession],
-				'headers' => ['Content-Type' => 'application/x-www-form-urlencoded'],
-				'body' => [
-					'project' => $projectName,
-					'uuidOption' => 'preserve',
-					'dupeOption' => $mode,
-					'xmlBatch' => $xml,
-				],
-			]);
+			$response = $this->client->post("/api/14/project/$projectName/jobs/import?dupeOption=$mode", [
+					'cookies' => ['JSESSIONID' => $this->jsession],
+					'headers' => [	'Content-Type' => 'application/xml'],
+					'body' => trim($xml)
+				]
+			);
 			$data = $this->decodeResponse($response);
 			return $data;
 		} catch (ClientException $e) {
-			// ignore, assume it's a 400 and the project already exists
+			$response = $e->getResponse();
+			$responseBodyAsString = $response->getBody()->getContents();
 		}
 	}
 
