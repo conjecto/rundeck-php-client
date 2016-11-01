@@ -2,6 +2,7 @@
 
 namespace Rundeck;
 
+use GuzzleHttp\Cookie\SessionCookieJar;
 use Rundeck\Api as api;
 
 use GuzzleHttp\Client;
@@ -11,32 +12,39 @@ class RundeckClient
 {
 
 	protected $client;
-	protected $jsession;
+	protected $cookie;
 	protected $majorMinorVersion;
 
 	public function __construct($url, $user, $pass)
 	{
 		$this->client = new Client([
-			'base_url' => $url
+			'base_uri' => $url
 		]);
 
-		$response = $this->client->post('/j_security_check', [
+		$response = $this->client->request('POST','/j_security_check', [
 			'allow_redirects' => false,
-			'body' => [
+			'form_params' => [
 				'j_username' => $user,
 				'j_password' => $pass
 			]
 		]);
 
-		$path = str_replace('JSESSIONID=', '', $response->getHeaders()['Set-Cookie'][0]);
-		$this->jsession = str_replace(';Path=/', '', $path);
+		$setCookie = new \GuzzleHttp\Cookie\SetCookie();
+		$setCookie2  = $setCookie->fromString($response->getHeaders()['Set-Cookie'][0]);
+		$setCookie2->setDomain('.');
+		$this->cookie = new \GuzzleHttp\Cookie\CookieJar();
+		$this->cookie ->setCookie($setCookie2);
+
 
 		$resp = $this->client->get("/api/1/system/info", [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		]);
 
-		$version = explode('.', (string)$resp->xml()->system->rundeck->version);
-
+		//$val = ;
+		//	$test = $val->getContents();
+		//	$version = explode('.', (string)$resp->getBody()->getContents();//xml()->system->rundeck->version);
+		$version = (string)(simplexml_load_string($resp->getBody()->getContents())->system->rundeck->version);
+		$version = explode('.', $version);
 		$this->majorMinorVersion = (int)($version[0] . $version[1]);
 	}
 
@@ -48,7 +56,7 @@ class RundeckClient
 	public function getProjects()
 	{
 		$resp = $this->client->get('/api/1/projects', [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		]);
 
 		$data = $this->decodeResponse($resp);
@@ -69,7 +77,7 @@ class RundeckClient
 			$filterPath .= '&jobExactFilter=' . $filterName;
 		}
 		$resp = $this->client->get("/api/14/project/$projectName/jobs?a$jobPath$groupPath$filterPath", [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		]);
 
 		$data = $this->decodeResponse($resp);
@@ -88,7 +96,7 @@ class RundeckClient
 	{
 		try {
 			$response = $this->client->post("/api/14/job/$jobId/schedule/disable", [
-				'cookies' => ['JSESSIONID' => $this->jsession]
+				'cookies' => $this->cookie
 			]);
 			$data = $this->decodeResponse($response);
 			return $data;
@@ -101,7 +109,7 @@ class RundeckClient
 	{
 		try {
 			$response = $this->client->post("/api/14/job/$jobId/schedule/enable", [
-				'cookies' => ['JSESSIONID' => $this->jsession]
+				'cookies' => $this->cookie
 			]);
 			$data = $this->decodeResponse($response);
 			return $data;
@@ -113,7 +121,7 @@ class RundeckClient
 	public function runJob($id)
 	{
 		$resp = $this->client->get("/api/1/job/$id/run", [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		]);
 
 		$data = $this->decodeResponse($resp);
@@ -131,7 +139,7 @@ class RundeckClient
 	public function JobInfo($id)
 	{
 		$resp = $this->client->get("/api/1/job/$id", [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		]);
 
 		$data = $this->decodeResponse($resp);
@@ -156,7 +164,7 @@ class RundeckClient
 		}
 
 		$resp = $this->client->get("/api/1/job/$jobId/executions?a$offsetPath$maxPath$statusPath", [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		]);
 
 		$data = $this->decodeResponse($resp);
@@ -174,7 +182,7 @@ class RundeckClient
 	public function getJobsExecStatus($execId)
 	{
 		$resp = $this->client->get("/api/5/execution/$execId/output", [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		]);
 		$data = $this->decodeResponse($resp);
 		return $data;
@@ -188,7 +196,7 @@ class RundeckClient
 
 		try {
 			$this->client->post('/api/11/projects', [
-				'cookies' => ['JSESSIONID' => $this->jsession],
+				'cookies' => $this->cookie,
 				'json'    => ["name" => $name],
 			]);
 		} catch (ClientException $e) {
@@ -204,7 +212,7 @@ class RundeckClient
 
 		try {
 			$this->client->delete("/api/11/project/$name", [
-				'cookies' => ['JSESSIONID' => $this->jsession]
+				'cookies' => $this->cookie
 			]);
 		} catch (ClientException $e) {
 			// ignore, assume it's a 404 and the project already exists
@@ -218,17 +226,17 @@ class RundeckClient
 			$jobPath .= '&idlist=' . $jobId;
 		}
 		return $this->client->get("/api/10/jobs/export?project=$projectName$jobPath", [
-			'cookies' => ['JSESSIONID' => $this->jsession]
+			'cookies' => $this->cookie
 		])->xml()->asXML();
 	}
 
 	public function importJobs($projectName, $xml,$mode = 'create')
 	{
 		try {
-			$response = $this->client->post("/api/14/project/$projectName/jobs/import?dupeOption=$mode", [
-					'cookies' => ['JSESSIONID' => $this->jsession],
+			$response = $this->client->request('POST', "/api/14/project/$projectName/jobs/import?dupeOption=$mode", [
+					'cookies' => $this->cookie,
 					'headers' => [	'Content-Type' => 'application/xml'],
-					'body' => trim($xml)
+					'form_params' => trim($xml)
 				]
 			);
 			$data = $this->decodeResponse($response);
@@ -241,7 +249,7 @@ class RundeckClient
 
 	private function decodeResponse($resp)
 	{
-		$xml = simplexml_load_string($resp->xml()->asXml());
+		$xml = simplexml_load_string($resp->getBody()->getContents());
 		$json = json_encode($xml);
 
 		return json_decode($json, true);
