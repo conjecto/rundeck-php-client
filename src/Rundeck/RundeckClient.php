@@ -236,7 +236,7 @@ class RundeckClient
 			$response = $this->client->request('POST', "/api/14/project/$projectName/jobs/import?dupeOption=$mode", [
 					'cookies' => $this->cookie,
 					'headers' => [	'Content-Type' => 'application/xml'],
-					'form_params' => [trim($xml)]
+					'body' => trim($xml)
 				]
 			);
 			$data = $this->decodeResponse($response);
